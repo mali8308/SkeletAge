@@ -4,7 +4,7 @@
 ![R Version](https://img.shields.io/badge/R-%3E%3D4.3.3-blue)
 ![Elastic Net Regression](https://img.shields.io/badge/ElasticNet-%E2%9C%94-green)  
 
-SkeletAge is a tissue-specific aging clock designed to predict biological age using transcriptomic data from skeletal muscle tissue. Built with cutting-edge machine learning, it identifies the **ageprint**—a tissue-specific set of genes regulating baseline healthy aging.  
+SkeletAge is an aging clock designed to predict biological age using transcriptomic data from skeletal muscle tissue. Its main goal is to be able to identify the **ageprint**—a tissue-specific set of genes that regulate baseline healthy aging.  
 
 ---
 
