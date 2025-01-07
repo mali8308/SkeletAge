@@ -3,58 +3,58 @@
 ![GitHub Repo Size](https://img.shields.io/github/repo-size/username/SkeletAge)  
 ![License](https://img.shields.io/github/license/username/SkeletAge)  
 ![R Version](https://img.shields.io/badge/R-%3E%3D4.3.3-blue)  
+![Elastic Net Regression](https://img.shields.io/badge/ElasticNet-%E2%9C%94-green)  
 
-SkeletAge is a cutting-edge aging clock developed using transcriptomic data from skeletal muscle tissue. This tool predicts biological age with exceptional accuracy and provides deep insights into the molecular basis of aging.  
+SkeletAge is a tissue-specific aging clock designed to predict biological age using transcriptomic data from skeletal muscle tissue. Built with cutting-edge machine learning, it identifies the **ageprint**—a tissue-specific set of genes regulating baseline healthy aging.  
 
 ---
 
 ## 🌟 **Key Features**  
 
-✅ **High Accuracy**:  
-- **Mean Absolute Error**: 9.5 years  
-- **Correlation**: Over 91% between real and predicted ages  
-
-✅ **Gene Discovery**:  
-- Identifies **22 key genes**, including **18 linked to aging** and **4 novel candidates**  
-
-✅ **Public Dataset Utilization**:  
-- Built and validated with **534 RNA-seq samples**  
-
-✅ **Insightful Findings**:  
-- Unveils a novel gene overexpressed in stem cells and younger individuals  
-
----
-
-## 🧬 **Project Highlights**  
-
-| **Attribute**       | **Details**                                                                 |
-|----------------------|-----------------------------------------------------------------------------|
-| **Dataset**          | **Training Set**: 262 samples <br> **Validation Set**: 272 samples         |
-| **Model**            | Elastic Net Regression                                                     |
-| **Top Gene Targets** | Includes CADM2 and a novel unstudied gene                                  |
-| **Applications**     | Biological age estimation, drug target identification, aging research      |
+- **High Accuracy**:  
+  - **Training Set**: Correlation 0.96, Mean Absolute Error (MAE) 6.55 years  
+  - **Validation Set**: Correlation 0.91, MAE 6.62 years  
+- **Gene Discovery**:  
+  - Identifies **128 genes** critical to skeletal muscle aging  
+  - Discovers **26 novel aging targets**  
+- **Tissue Specificity**:  
+  - Focused exclusively on skeletal muscle RNA-seq data from healthy individuals  
+- **Drug Discovery Potential**:  
+  - Links **23 genes** to druggable targets  
+  - Highlights **9 genes** associated with approved drugs, including 4 already studied for aging  
 
 ---
 
 ## 📂 **Repository Contents**  
 
-- **`data/`**: Preprocessed RNA-seq data and annotations  
-- **`models/`**: Trained models and scripts for predictions  
-- **`scripts/`**: Scripts for data preprocessing, feature selection, and model training  
-- **`docs/`**: Comprehensive documentation  
-- **`results/`**: Performance figures, tables, and key findings  
+- **`data/`**: Preprocessed RNA-seq data and Skeletome database  
+- **`models/`**: Trained elastic net regression model for SkeletAge  
+- **`scripts/`**: R scripts for preprocessing, modeling, and age prediction  
+- **`docs/`**: Methodology, dataset details, and performance metrics  
+- **`results/`**: Key findings, figures, and tables  
+
+---
+
+## 🧬 **Skeletome Database**  
+
+SkeletAge was developed using **Skeletome**, a comprehensive database of 534 skeletal muscle RNA-seq samples. Skeletome contains:  
+- Raw counts aligned to **GRCh38**  
+- Metadata with accurate age labels  
+- Samples from 19 to 90 years of age across 11 studies  
+
+Access Skeletome and accelerate your aging research: **[Skeletome GitHub Link](#)**  
 
 ---
 
 ## 🚀 **Getting Started**  
 
 ### **Prerequisites**  
-Make sure you have the following installed:  
+Ensure you have the following installed:  
 - **R (>= 4.3.3)**  
-- R packages: `glmnet`, `tidyverse`, `Seurat`, `DESeq2`  
+- R packages: `glmnet`, `DESeq2`, `tidyverse`, `ggplot2`, `biomaRt`, `clusterProfiler`  
 
 ### **Installation**  
-Clone the repository:  
+Clone this repository:  
 
 ```bash
 git clone https://github.com/username/SkeletAge.git
