@@ -1,7 +1,7 @@
 # 🦴 **SkeletAge: A Skeletal Muscle Transcriptomics-Based Aging Clock**  
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-![R Version](https://img.shields.io/badge/R-%3E%3D4.3.3-blue)  
+![R Version](https://img.shields.io/badge/R-%3E%3D4.3.3-blue)
 ![Elastic Net Regression](https://img.shields.io/badge/ElasticNet-%E2%9C%94-green)  
 
 SkeletAge is a tissue-specific aging clock designed to predict biological age using transcriptomic data from skeletal muscle tissue. Built with cutting-edge machine learning, it identifies the **ageprint**—a tissue-specific set of genes regulating baseline healthy aging.  
