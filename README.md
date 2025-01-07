@@ -1,7 +1,6 @@
 # 🦴 **SkeletAge: A Skeletal Muscle Transcriptomics-Based Aging Clock**  
 
-![GitHub Repo Size](https://img.shields.io/github/repo-size/username/SkeletAge)  
-![License](https://img.shields.io/github/license/username/SkeletAge)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 ![R Version](https://img.shields.io/badge/R-%3E%3D4.3.3-blue)  
 ![Elastic Net Regression](https://img.shields.io/badge/ElasticNet-%E2%9C%94-green)  
 
