@@ -1,0 +1,1624 @@
+
+
+Muhammad Ali
+
+SkeletAge
+
+# Libraries used by SkeletAge
+
+```{r}
+
+#Loading the libraries
+
+#I am using suppressPackageStartupMessages to prevent the messages of the package loading being printed. They are unnecessary and clutter the HTML. 
+
+# List of required packages
+required_packages <- c("tidyverse", "GSEABase", "org.Hs.eg.db", "clusterProfiler", 
+                       "GOstats", "GO.db", "Category", "topGO", "ggplot2", 
+                       "randomForest", "msigdbr", "fgsea", "AnnotationDbi", 
+                       "glmnet", "DESeq2", "enrichplot", "pathview", "DOSE", 
+                       "biomaRt", "dplyr", "ReactomePA", "igraph", "ggraph", 
+                       "STRINGdb", "reshape2")
+
+# Install packages if they are not already installed
+#installed_packages <- rownames(installed.packages())
+#for (pkg in required_packages) {
+#  if (!pkg %in% installed_packages) {
+#    install.packages(pkg, dependencies = TRUE)
+#  }
+#}
+
+# Install Bioconductor packages if needed
+bioc_packages <- c("GSEABase", "org.Hs.eg.db", "clusterProfiler", "GOstats", 
+                   "GO.db", "Category", "topGO", "msigdbr", "fgsea", "AnnotationDbi", 
+                   "DESeq2", "enrichplot", "pathview", "DOSE", "ReactomePA", 
+                   "STRINGdb","biomaRt", "ComplexHeatmap")
+
+#for (pkg in bioc_packages) {
+#  if (!pkg %in% installed_packages) {
+#    if (!requireNamespace("BiocManager", quietly = TRUE)) {
+#      install.packages("BiocManager")
+#    }
+#    BiocManager::install(pkg)
+#  }
+#}
+
+# Load the packages
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(GSEABase)
+  library(org.Hs.eg.db)
+  library(clusterProfiler)
+  library(GOstats)
+  library(GO.db)
+  library(Category)
+  library(topGO)
+  library(ggplot2)
+  library(randomForest)
+  library(msigdbr)
+  library(fgsea)
+  library(AnnotationDbi)
+  library(glmnet)
+  library(DESeq2)
+  library(enrichplot)
+  library(pathview)
+  library(DOSE)
+  library(biomaRt)
+  library(dplyr)
+  library(ReactomePA)
+  library(igraph)
+  library(ggraph)
+  library(STRINGdb)
+  library(reshape2)
+  library(ComplexHeatmap)
+})
+
+```
+
+# Custom functions used by SkeletAge
+
+```{r}
+
+#Metadata prepping tool for my own SRA run tables -- doesn't always work well. 
+
+metadata_prep = function(y)
+
+{
+
+x = data.frame(Age = y$Age,
+               Sex = y$gender,
+               Tissue = y$tissue,
+               row.names = y$Run)  
+
+
+x$Decade[as.integer(x$Age) >= 0 & as.integer(x$Age) < 10] = 1
+x$Decade[as.integer(x$Age) >= 10 & as.integer(x$Age) < 20] = 2
+x$Decade[as.integer(x$Age) >= 20 & as.integer(x$Age) < 30] = 3
+x$Decade[as.integer(x$Age) >= 30 & as.integer(x$Age) < 40] = 4
+x$Decade[as.integer(x$Age) >= 40 & as.integer(x$Age) < 50] = 5
+x$Decade[as.integer(x$Age) >= 50 & as.integer(x$Age) < 60] = 6
+x$Decade[as.integer(x$Age) >= 60 & as.integer(x$Age) < 70] = 7
+x$Decade[as.integer(x$Age) >= 70 & as.integer(x$Age) < 80] = 8
+x$Decade[as.integer(x$Age) >= 80 & as.integer(x$Age) < 90] = 9
+x$Decade[as.integer(x$Age) >= 90 & as.integer(x$Age) < 100] = 10
+x$Decade[as.integer(x$Age) >= 100 & as.integer(x$Age) < 110] = 11
+
+x[x$Sex=="female",]$Sex = "Female"
+x[x$Sex=="male",]$Sex = "Male"
+
+return(x)
+
+}
+
+#-------------------------------------------------------------------------------
+
+#Function for getting decade categories for metadata. 
+
+decade_marker = function(x)
+  
+{
+  
+x$Decade[as.integer(x$Age) >= 0 & as.integer(x$Age) < 10] = 1
+x$Decade[as.integer(x$Age) >= 10 & as.integer(x$Age) < 20] = 2
+x$Decade[as.integer(x$Age) >= 20 & as.integer(x$Age) < 30] = 3
+x$Decade[as.integer(x$Age) >= 30 & as.integer(x$Age) < 40] = 4
+x$Decade[as.integer(x$Age) >= 40 & as.integer(x$Age) < 50] = 5
+x$Decade[as.integer(x$Age) >= 50 & as.integer(x$Age) < 60] = 6
+x$Decade[as.integer(x$Age) >= 60 & as.integer(x$Age) < 70] = 7
+x$Decade[as.integer(x$Age) >= 70 & as.integer(x$Age) < 80] = 8
+x$Decade[as.integer(x$Age) >= 80 & as.integer(x$Age) < 90] = 9
+x$Decade[as.integer(x$Age) >= 90 & as.integer(x$Age) < 100] = 10
+x$Decade[as.integer(x$Age) >= 100 & as.integer(x$Age) < 110] = 11
+
+return(x)
+
+}
+
+#-------------------------------------------------------------------------------
+
+#Counts matrix for my own pipeline-derived counts. 
+
+raw_counts_prep = function(x)
+  
+{
+
+row.names(x) = x$Geneid
+
+x = x[,-(1:6)]
+
+colnames(x) = gsub(".*(SRR[0-9]+).*", "\\1", colnames(x))
+
+return(x)
+  
+}
+
+#-------------------------------------------------------------------------------
+
+#Counts matrix prepping function for NCBI pipeline-derived counts matrix. 
+
+counts_mat_prep = function(x,y)
+
+{
+
+row.names(x) = x$GeneID
+
+x = x[,-1]
+
+x = x[,y$Sample]
+
+return(x)
+
+}
+
+#-------------------------------------------------------------------------------
+
+dedup_rowname = function(x)
+
+{
+  
+  dup_ind = which(duplicated(x$Sample))
+  
+  x = x[-dup_ind,]
+  
+  return(x)
+  
+  
+}
+
+
+```
+
+# Ageprint function
+
+This function takes in 4 parameters:
+
+-   train_data_genes: The gene expression data for the training set
+
+-   test_data_genes: The gene expression data for the testing set
+
+-   train_data_ages: The ages of the samples in the training set
+
+-   test_data_ages: The ages of the samples in the testing set
+
+The **expression data** **must** **be normalized before passing it to the Ageprint function**.
+
+The function then performs hyperparamerter tuning for the Elastic Net model using leave-one-out cross-validation, and returns different performance metrics for a bunch of models, while also saving them as .rds objects to reduce downstream processing time.
+
+At the end, it produces a dataframe with the mean squared error (MSE) for both the training and the testing sets, the correlation for both the training and the testing set, the number of genes (non-zero coefficients) for the model, the R-squared value, and the names of the genes.
+
+While the Ageprint function has only been used for skeletal muscle data, it can be used for any other tissue type to identify the ageprint.
+
+```{r}
+library(future)
+library(future.apply)
+
+# Set up the plan to use 4 cores
+plan(multicore, workers = 4)
+
+gene_prediction = function(train_data_genes,
+                                    test_data_genes,
+                                    train_data_ages,
+                                    test_data_ages) {
+  require(glmnet)
+
+  # Ensure the data is transposed and in the correct format
+  set.seed(1010)
+  
+  train_data_genes = t(train_data_genes)
+  train_data_ages = as.double(train_data_ages)
+  test_data_genes = t(test_data_genes)
+  test_data_ages = as.double(test_data_ages)
+
+  # Define alpha range
+  alpha_range = 0:10 / 10
+
+  # Function to fit model for each alpha and return parameters
+  fit_model_for_alpha = function(a) {
+    params = data.frame(Alpha = a, MSE_training = NA, Correlation_training = NA, 
+                        MSE_test = NA, Correlation_test = NA, 
+                        Number_of_Genes = NA, R_2 = NA, Gene_Names = NA)
+    
+    # Train model with elastic net using a specific alpha
+    alpha_fit = cv.glmnet(train_data_genes, train_data_ages, type.measure="mse", 
+                          alpha=a, family="gaussian", nfolds=length(train_data_ages))
+    
+    # Save the model
+    saveRDS(alpha_fit, file = paste0("/Users/ali/Desktop/NYU/SkeletAge/elastic_net_model_alpha_", a, ".rds"))
+
+    # Predictions on training data
+    train_predicted = predict(alpha_fit, s=alpha_fit$lambda.1se, newx=train_data_genes)
+    params$MSE_training = mean((train_data_ages - train_predicted)^2)
+    params$Correlation_training = cor(train_predicted, train_data_ages)
+    
+    # Predictions on test data
+    test_predicted = predict(alpha_fit, s=alpha_fit$lambda.1se, newx=test_data_genes)
+    params$MSE_test = mean((test_data_ages - test_predicted)^2)
+    params$Correlation_test = cor(test_predicted, test_data_ages)
+    
+    # Calculate R squared
+    tss = sum((test_data_ages - mean(test_data_ages))^2)
+    rss = sum((test_data_ages - test_predicted)^2)
+    params$R_2 = 1 - (rss / tss)
+    
+    # Calculate Adjusted R squared
+    n = length(test_data_ages)  # number of test samples
+    
+    # number of non-zero coefficients (excluding intercept)
+    p = length(which(coef(alpha_fit, s=alpha_fit$lambda.1se) != 0)) - 1  
+    
+    if (p > 0) {
+      params$Adjusted_R_2 = 1 - ((1 - params$R_2) * (n - 1)) / (n - p - 1)
+    } else {
+      params$Adjusted_R_2 = NA  # No non-zero coefficients
+    }
+
+    # Extract important genes
+    coeff_model = coef(alpha_fit)
+    coeff_model = as.data.frame(as.matrix(coeff_model))
+    imp_genes = rownames(coeff_model)[coeff_model$s1 != 0][-1]  # exclude intercept
+    params$Number_of_Genes = length(imp_genes)
+    params$Gene_Names = paste(imp_genes, collapse = ",")
+    
+    return(params)
+  }
+
+  # Use future_lapply to run in parallel over alpha_range using 6 cores
+  results = future_lapply(alpha_range, fit_model_for_alpha)
+
+  # Combine results into a single data frame
+  parameters = do.call(rbind, results)
+  
+  # Add MSE difference and filter best model
+  parameters$MSE_difference = parameters$MSE_test - parameters$MSE_training
+  best_model = parameters[parameters$MSE_difference > 0 & parameters$Correlation_training > 0.9,]
+  best_model = best_model[best_model$MSE_training > 1,]
+  best_model = best_model[order(best_model$MSE_training),]
+  
+  return(best_model)
+}
+
+
+```
+
+## Loading Skeletome data and metadata
+
+```{r}
+
+skeletage_metadata = read.csv("/Users/ali/Desktop/NYU/SkeletAge/Metadata_Complete.csv")
+
+skeletage_counts = read.csv("/Users/ali/Desktop/NYU/SkeletAge/Complete_Raw_Counts.csv")
+
+row.names(skeletage_counts) = skeletage_counts$X
+
+skeletage_counts = skeletage_counts[,-1]
+
+```
+
+### Pre-normalized data to speed up processing time
+
+```{r}
+
+#skeletage_metadata = read.csv("/Users/ali/Desktop/NYU/SkeletAge/Metadata_Complete.csv")
+
+#Pre-load normalized counts
+
+#normalized_counts = read.csv("/Users/ali/Desktop/NYU/SkeletAge/normalized_counts_training.csv")
+
+#row.names(normalized_counts) = normalized_counts$X
+
+#normalized_counts = normalized_counts[,-1]
+
+
+#-------------------------------------------------------------------------------
+
+#counts_test = read.csv("/Users/ali/Desktop/NYU/SkeletAge/normalized_counts_test.csv")
+
+#row.names(counts_test) = counts_test$X
+
+#counts_test = counts_test[,-1]
+
+#-------------------------------------------------------------------------------
+
+#metadata_complete = skeletage_metadata[skeletage_metadata$Study == "GSE164471" |
+#                                         skeletage_metadata$Study == "GSE97084" |
+#                                         skeletage_metadata$Study == "GSE144304" ,]
+
+
+#row.names(metadata_complete) = metadata_complete$Sample
+
+#metadata_complete = metadata_complete[,-1]
+
+#metadata_complete$Decade = as.factor(metadata_complete$Decade)
+#metadata_complete$Decade = relevel(metadata_complete$Decade, ref = "3")
+
+#-------------------------------------------------------------------------------
+
+#test_metadata = skeletage_metadata[skeletage_metadata$Sample != row.names(metadata_complete),]
+
+
+#test_metadata = dedup_rowname(test_metadata)
+
+#row.names(test_metadata) = test_metadata$Sample
+
+#test_metadata = test_metadata[,-1]
+
+#test_metadata$Decade = as.factor(test_metadata$Decade)
+
+#counts_test_data_for_model = t(counts_test)
+
+#model_testing_ages = as.double(test_metadata$Age)
+
+
+```
+
+### Creating the training set
+
+```{r}
+
+metadata_complete = skeletage_metadata[skeletage_metadata$Study == "GSE164471" |
+                                         skeletage_metadata$Study == "GSE97084" |
+                                         skeletage_metadata$Study == "GSE144304" ,]
+
+
+row.names(metadata_complete) = metadata_complete$Sample
+
+metadata_complete = metadata_complete[,-1]
+
+#I am using the Decade column in the metadata as the predictor. And I am releveling it to "3". Which means that the gene expression changes across different ages will be calculated against people who are in their 20s-30. 
+
+metadata_complete$Decade = as.factor(metadata_complete$Decade)
+metadata_complete$Decade = relevel(metadata_complete$Decade, ref = "3")
+
+
+raw_counts_complete = skeletage_counts[,row.names(metadata_complete)]
+
+```
+
+#### DESeq2 for expression profiling and counts normalization
+
+```{r}
+
+library(BiocParallel)
+
+# Set up the parallel backend to use 6 cores
+register(MulticoreParam(6))
+
+
+
+library(DESeq2)
+
+cds = DESeqDataSetFromMatrix(countData = raw_counts_complete, colData = metadata_complete, 
+                              design = ~ Decade) 
+
+cds = DESeq(cds, parallel = TRUE) 
+
+exp_results = results(cds)
+
+deseq_decades = list()
+
+#Here I am looping thorugh the different results for each individual decade in the DESeq results. This allows me to get the DEGs for each decade (compared to decade 3). 
+
+for (i in 2:length(resultsNames(cds)))
+{
+
+test_res_all = matrix() 
+   
+test_res=results(cds, name=resultsNames(cds)[i])
+
+test_res_up = subset(test_res, log2FoldChange > 1)
+test_res_down = subset(test_res, log2FoldChange < 1)
+test_res_all = rbind(test_res_up,test_res_down)
+
+deseq_decades[[resultsNames(cds)[i]]] = test_res_all
+  
+}
+
+
+#After that I create a matrix of normalized counts using the counts function. And I will be using these normalized counts for my subsequent analyses. 
+
+normalized_counts = counts(cds, normalized = T)
+
+```
+
+#### Counts normalization for the test set
+
+```{r}
+
+#Getting normalized counts for the test data. 
+
+
+register(MulticoreParam(6))
+
+
+test_metadata = skeletage_metadata[skeletage_metadata$Sample != row.names(metadata_complete),]
+
+
+#test_metadata = dedup_rowname(test_metadata)
+
+row.names(test_metadata) = test_metadata$Sample
+
+test_metadata = test_metadata[,-1]
+
+test_metadata$Decade = as.factor(test_metadata$Decade)
+
+
+raw_test_data = skeletage_counts[,row.names(test_metadata)]
+
+
+test_cds = DESeqDataSetFromMatrix(countData = raw_test_data, colData = test_metadata,
+                                  design = ~ Decade)
+test_cds = DESeq(test_cds, parallel = T)
+
+```
+
+### Creating the testing set
+
+```{r}
+
+exp_results_test = results(test_cds)
+
+counts_test = counts(test_cds, normalized = T)
+
+#counts_test = as.data.frame(counts_test[which(row.names(counts_test) %in% colnames(model_data)),])
+
+counts_test_data_for_model = t(counts_test)
+
+model_testing_ages = as.double(test_metadata$Age)
+
+```
+
+**----------------------------------------------------------------------------**
+
+### Running the Ageprint function
+
+```{r}
+
+best_model = gene_prediction(train_data_genes = normalized_counts,
+                             train_data_ages = metadata_complete$Age,
+                             test_data_genes = counts_test,
+                             test_data_ages = test_metadata$Age)
+
+
+best_model
+
+```
+
+#### Using the best-performing model for predicting the training set itself
+
+```{r}
+
+set.seed(1010) #set.seed(1011) also worked well.
+
+model_data = (t(normalized_counts))
+
+train_data_genes = model_data
+
+train_data_ages = as.double(metadata_complete$Age)
+
+#-------------------------------------------------------------------------------
+
+#model_path = paste0("/Users/ali/Desktop/NYU/SkeletAge/elastic_net_model_alpha_",best_model$Alpha[1],".rds")
+
+model_path = paste0("/Users/ali/Desktop/NYU/SkeletAge/elastic_net_model_alpha_0.1.rds")
+
+alpha0.fit = readRDS(model_path)
+  
+#cv.glmnet(train_data_genes, train_data_ages, type.measure="mse",
+#                       alpha=best_model$Alpha[1], family="gaussian",
+#                       nfolds = length(train_data_ages) )
+
+
+#-------------------------------------------------------------------------------
+
+train_predict = predict(alpha0.fit, s=alpha0.fit$lambda.1se, newx=train_data_genes)
+
+print(paste("The MAE is:", mean(abs(train_data_ages - train_predict))))
+
+predicting_itself = as.data.frame(train_predict)
+
+predicting_itself = data.frame(Predicted_Age = predicting_itself$s1, 
+                              Real_Age = train_data_ages,
+                              row.names = row.names(predicting_itself))
+
+# Calculate R²
+ss_total <- sum((predicting_itself$Real_Age - mean(predicting_itself$Real_Age))^2)
+ss_residual <- sum((predicting_itself$Real_Age - predicting_itself$Predicted_Age)^2)
+r_squared <- 1 - (ss_residual / ss_total)
+
+print(paste("The R² value is:", r_squared))
+
+# Calculate the adjusted R²
+adjusted_r_squared <- 1 - ((1 - r_squared) * (length(train_data_ages) - 1)) / (length(train_data_ages) - 129 - 1)
+
+print(paste("The adjusted R² value is:", adjusted_r_squared))
+
+
+```
+
+```{r}
+
+plot = ggplot(predicting_itself, aes(x = Real_Age, y = Predicted_Age)) +
+  
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted", color = "black") +
+  geom_smooth(method = "glm", se = T, color = "dodgerblue2") +
+  labs(x = "Real Age", y = "Predicted Age", 
+       title = paste("Real Age vs Predicted Age: model predicting the training set's ages (", 
+                     length(train_data_ages), " samples)", sep = "")) +
+  annotate("text", x = Inf, y = Inf, label = paste("Correlation: ", 
+                                                   100*round(cor(predicting_itself$Predicted_Age, 
+                                                                        predicting_itself$Real_Age), 2), "%", 
+                                                   sep = ""), 
+           vjust = 3, hjust = 6, size = 4, color = "black")
+plot
+
+cor.test(predicting_itself$Predicted_Age, predicting_itself$Real_Age)
+
+#ggsave("training_real_vs_predicted_age_plot.png", plot, width = 12, height = 6, units = "in")
+
+```
+
+#### Predicting the validation set's age
+
+```{r}
+
+
+alpha0.predicted = predict(alpha0.fit, s=alpha0.fit$lambda.1se, newx=counts_test_data_for_model)
+
+print(paste("The MAE is:", mean(abs(model_testing_ages - alpha0.predicted))))
+
+predicted_ages_0 = as.data.frame(alpha0.predicted)
+
+predicted_ages_0 = data.frame(Predicted_Age = predicted_ages_0$s1, 
+                              Real_Age = model_testing_ages,
+                              row.names = row.names(predicted_ages_0))
+
+predicted_ages_0
+
+print(paste("The correlation between predicted and real ages is: ", cor(predicted_ages_0$Predicted_Age, 
+                                                                        predicted_ages_0$Real_Age)))
+
+
+# Assuming predicting_itself contains your final dataframe with Real_Age and Predicted_Age
+# Calculate the total sum of squares (SS_total) and residual sum of squares (SS_residual)
+ss_total <- sum((predicted_ages_0$Real_Age - mean(predicted_ages_0$Real_Age))^2)
+ss_residual <- sum((predicted_ages_0$Real_Age - predicted_ages_0$Predicted_Age)^2)
+
+# Calculate R²
+r_squared <- 1 - (ss_residual / ss_total)
+print(paste("The R² value is:", r_squared))
+
+# Now calculate the adjusted R²
+# Replace 129 with the actual number of predictors in your model
+n <- length(predicted_ages_0$Real_Age)  # Number of observations
+p <- 129  # Number of predictors used in the model
+
+adjusted_r_squared <- 1 - ((1 - r_squared) * (n - 1)) / (n - p - 1)
+print(paste("The adjusted R² value is:", adjusted_r_squared))
+
+# Calculate Median Absolute Error (MedAE)
+medae <- median(abs(predicted_ages_0$Real_Age - predicted_ages_0$Predicted_Age))
+print(paste("The Median Absolute Error (MedAE) is:", medae))
+
+
+```
+
+*Here I am simply adding some contextual information to the validation set such as health conditions that the samples might be suffering from, and the dataset they are a part of. This allows me to observe the results along with the specific conditions of the samples and account for inter-dataset differences*
+
+```{r}
+
+predicted_ages_0$Condition = test_metadata$Condition
+
+predicted_ages_0$GEO = test_metadata$Study
+
+```
+
+Superimposed lines from the training and testing sets to compare the prediction accuracy of the model.
+
+```{r}
+
+library(ggplot2)
+
+plot = ggplot(predicted_ages_0, aes(x = Real_Age, y = Predicted_Age, color = Condition)) +
+  geom_point() +  # Scatter plot without shape marks
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted", color = "black") +  
+  geom_smooth(method = "glm", se = TRUE, color = "firebrick2") +  
+  labs(x = "Real Age", y = "Predicted Age", 
+       title = paste("Real Age vs Predicted Age: model predicting the validation set's ages (", 
+                     length(model_testing_ages), " samples)", sep = "")) +
+  annotate("text", x = Inf, y = Inf, label = paste("Correlation: ", 
+                                                   100 * round(cor(predicted_ages_0$Predicted_Age, 
+                                                                    predicted_ages_0$Real_Age), 2), "%", 
+                                                   sep = ""), 
+           vjust = 3, hjust = 6, size = 4, color = "black")
+
+curve_from_first_plot = geom_smooth(data = predicting_itself, aes(x = Real_Age, y = Predicted_Age), 
+                                     method = "glm", se = TRUE, color = "dodgerblue2")
+
+final_plot = plot + curve_from_first_plot
+
+#ggsave("/Users/ali/Desktop/NYU/2nd Semester/Applied Genomics/condition_real_vs_predicted_age_plot.png", 
+ #      final_plot, width = 12, height = 6, units = "in")
+
+final_plot
+
+#Age prediction is non-linear during adolescence (https://doi.org/10.1016/j.arr.2022.101743)
+
+cor(predicted_ages_0$Predicted_Age,predicted_ages_0$Real_Age)
+
+# Calculate R²
+ss_total <- sum((predicted_ages_0$Real_Age - mean(predicted_ages_0$Real_Age))^2)
+ss_residual <- sum((predicted_ages_0$Real_Age - predicted_ages_0$Predicted_Age)^2)
+r_squared <- 1 - (ss_residual / ss_total)
+
+print(paste("The R² value is:", r_squared))
+
+
+```
+
+## Figure 2A
+
+```{r}
+
+
+library(ggplot2)
+
+figure_2a = ggplot(predicted_ages_0, aes(x = Real_Age, y = Predicted_Age, color = Condition)) +
+  geom_point() +  # Scatter plot without shape marks
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted", color = "black") +  
+  geom_smooth(method = "glm", se = TRUE, color = "firebrick2") +  
+  labs(x = "Real Age", y = "Predicted Age", 
+       title = paste("(A) Real Age vs Predicted Age: SkeletAge predicting the validation set's ages (", 
+                     length(model_testing_ages), " samples)", sep = "")) +
+    theme_minimal()
+
+figure_2a
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_2a.png", 
+       figure_2a, width = 12, height = 6, units = "in", dpi = 500, bg = "white")
+
+
+#-------------------------------------------------------------------------------
+
+#Age prediction is non-linear during adolescence (https://doi.org/10.1016/j.arr.2022.101743)
+
+correlation_p = cor.test(predicted_ages_0$Predicted_Age,predicted_ages_0$Real_Age)
+
+print(paste("The Pearson correlation and the p-value for the correlation is:", correlation_p$estimate, 
+            "and", correlation_p$p.value, "respectively."))
+            
+# Calculate R²
+ss_total = sum((predicted_ages_0$Real_Age - mean(predicted_ages_0$Real_Age))^2)
+ss_residual = sum((predicted_ages_0$Real_Age - predicted_ages_0$Predicted_Age)^2)
+r_squared = 1 - (ss_residual / ss_total)
+
+print(paste("The R² value is:", r_squared))
+
+
+```
+
+```{r}
+
+
+library(RNAAgeCalc)
+
+RNAAgeCalc_predictions = predict_age(exprdata = raw_test_data, tissue = "muscle", exprtype = "counts",
+                                     idtype = "ENTREZID")
+
+
+RNAAgeCalc_data_frame = cbind(RNAAgeCalc_predictions, predicted_ages_0)
+
+RNAAgeCalc_data_frame
+
+
+```
+
+## Figure 2B
+
+```{r}
+# Modify the plot with the new dataframe for the orange best-fit line
+plot = ggplot(RNAAgeCalc_data_frame, aes(x = Real_Age, y = RNAAge, color = Condition)) +
+  geom_point() +  # Scatter plot without shape marks
+  geom_abline(intercept = 0, slope = 1, linetype = "dotted", color = "black") +  
+  geom_smooth(method = "glm", se = TRUE, color = "orange") +  
+  labs(x = "Real Age", y = "Predicted Age", 
+       title = paste("(B) RNAAgeCalc vs SkeletAge: predicting the validation set's ages (", 
+                     length(model_testing_ages), " samples)", sep = ""))+
+  theme_minimal() + guides(color = FALSE)  
+
+# Add a line of best fit using RNAAgeCalc_predictions and RNAAge
+rna_age_best_fit = geom_smooth(data = RNAAgeCalc_data_frame, 
+                               aes(x = Real_Age, y = Predicted_Age), 
+                               method = "glm", se = TRUE, color = "firebrick2")
+# Combine the plots
+figure_2b = plot + rna_age_best_fit
+
+# Display the final plot
+figure_2b
+
+# Calculate and display R² value for predicted_ages_0
+correlation_value = cor.test(RNAAgeCalc_data_frame$RNAAge, RNAAgeCalc_data_frame$Real_Age)
+
+
+ss_total <- sum((RNAAgeCalc_data_frame$Real_Age - mean(RNAAgeCalc_data_frame$Real_Age))^2)
+ss_residual <- sum((RNAAgeCalc_data_frame$Real_Age - RNAAgeCalc_data_frame$RNAAge)^2)
+r_squared <- 1 - (ss_residual / ss_total)
+
+print(paste("The R² value is:", r_squared))
+
+print(paste("The correlation between the predicted (RNAAgeCalc) and real ages is:", correlation_value$estimate,
+            "and the p-value is:", correlation_value$p.value))
+
+print(paste("The MAE is:", mean(abs(model_testing_ages - RNAAgeCalc_data_frame$RNAAge))))
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_2b.png", 
+       figure_2b, width = 12, height = 6, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 2C and 2D
+
+```{r}
+
+library(patchwork)
+library(ggplot2)
+
+figure_2ab = (figure_2a + figure_2b) + 
+  plot_layout(ncol = 1, nrow = 2, guides = "collect") 
+
+# Save the combined plot with one legend
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_2ab.png", 
+       figure_2ab, width = 12, height = 12, units = "in", dpi = 500, bg = "white")
+
+
+# MAE and Correlation data for validation (Figure c)
+skeletage_vs_RNAAge_test_data_2c <- data.frame(Method = c("RNAAgeCalc", "SkeletAge"),
+                                               MAE = c(mean(abs(model_testing_ages - RNAAgeCalc_data_frame$RNAAge)),
+                                                       mean(abs(model_testing_ages - alpha0.predicted))),
+                                               Correlation = c(correlation_value$estimate,
+                                                               correlation_p$estimate))
+
+
+# MAE and Correlation data for training (Figure d)
+skeletage_vs_RNAAge_training_data_2d <- data.frame(Method = c("RNAAgeCalc", "SkeletAge"),
+                                                   MAE = c(mean(abs(model_testing_ages - RNAAgeCalc_data_frame_training$RNAAge)),
+                                                           mean(abs(train_data_ages - train_predict))),
+                                                   Correlation = c(cor(RNAAgeCalc_data_frame_training$RNAAge,
+                                                                       RNAAgeCalc_data_frame_training$Real_Age),
+                                                                   cor(predicting_itself$Predicted_Age,
+                                                                       predicting_itself$Real_Age)))
+
+
+#-------------------------------------------------------------------------------
+
+
+mae_plot_test = ggplot(data = skeletage_vs_RNAAge_test_data_2c, aes(x = Method, y = MAE, fill = Method)) +
+  geom_bar(stat = "identity", show.legend = T, width = 0.60, color = "black") +
+  geom_text(aes(label = round(MAE, 2)), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("RNAAgeCalc" = "orange", "SkeletAge" = "firebrick2")) +
+  labs(title = "(C) MAE and Correlation of RNAAgeCalc and SkeletAge on the validation set", x = NULL, y = "MAE (Years)") +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+cor_plot_test = ggplot(data = skeletage_vs_RNAAge_test_data_2c, aes(x = Method, y = Correlation, fill = Method)) +
+  geom_bar(stat = "identity", show.legend = T, width = 0.60, color = "black") +
+  geom_text(aes(label = round(Correlation, 2)), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("RNAAgeCalc" = "orange", "SkeletAge" = "firebrick2")) +
+  labs(x = NULL, y = "Correlation") +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+figure_2c = (mae_plot_test + cor_plot_test) + 
+  plot_layout(ncol = 2, nrow = 1, guides = "collect") +
+  theme(axis.title = element_text(size = 14))
+
+#-------------------------------------------------------------------------------
+
+mae_plot_train = ggplot(data = skeletage_vs_RNAAge_training_data_2d, aes(x = Method, y = MAE, fill = Method)) +
+  geom_bar(stat = "identity", show.legend = T, width = 0.60, color = "black") +
+  geom_text(aes(label = round(MAE, 2)), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("RNAAgeCalc" = "orange", "SkeletAge" = "dodgerblue")) +
+  labs(title = "(D) MAE and Correlation of RNAAgeCalc and SkeletAge on the training set", x = NULL, y = "MAE (Years)") +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+cor_plot_train = ggplot(data = skeletage_vs_RNAAge_training_data_2d, aes(x = Method, y = Correlation, fill = Method)) +
+  geom_bar(stat = "identity", show.legend = T, width = 0.60, color = "black") +
+  geom_text(aes(label = round(Correlation, 2)), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("RNAAgeCalc" = "orange", "SkeletAge" = "dodgerblue")) +
+  labs(x = NULL, y = "Correlation") +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14)
+  )
+
+figure_2d = (mae_plot_train + cor_plot_train) + 
+  plot_layout(ncol = 2, nrow = 1, guides = "collect") +
+  theme(axis.title = element_text(size = 14))
+
+
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_2c.png", 
+       figure_2c, width = 9, height = 6, units = "in", dpi = 500, bg = "white")
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_2d.png", 
+       figure_2d, width = 9, height = 6, units = "in", dpi = 500, bg = "white")
+
+figure_2c
+figure_2d
+
+```
+
+### RNAAgeCalc and SkeletAge on the testing set
+
+```{r}
+
+wilcox.test(RNAAgeCalc_data_frame$Real_Age, RNAAgeCalc_data_frame$Predicted_Age, paired = T)
+
+wilcox.test(RNAAgeCalc_data_frame$Real_Age, RNAAgeCalc_data_frame$RNAAge, paired = T)
+wilcox.test(RNAAgeCalc_data_frame$Real_Age, RNAAgeCalc_data_frame$RNAAge, paired = T)[3]
+
+wilcox.test(RNAAgeCalc_data_frame$RNAAge, RNAAgeCalc_data_frame$Predicted_Age, paired = T)
+wilcox.test(RNAAgeCalc_data_frame$RNAAge, RNAAgeCalc_data_frame$Predicted_Age, paired = T)[3]
+
+
+```
+
+### RNAAgeCalc and SkeletAge on the training set
+
+```{r}
+
+RNAAgeCalc_predictions_training = predict_age(exprdata = raw_counts_complete, tissue = "muscle", exprtype = "counts",
+                                              idtype = "ENTREZID")
+
+RNAAgeCalc_data_frame_training = cbind(RNAAgeCalc_predictions_training, predicting_itself)
+
+RNAAgeCalc_data_frame_training
+
+
+correlation_value = cor.test(RNAAgeCalc_data_frame_training$RNAAge, RNAAgeCalc_data_frame_training$Real_Age)
+
+ss_total <- sum((RNAAgeCalc_data_frame_training$Real_Age - mean(RNAAgeCalc_data_frame_training$Real_Age))^2)
+ss_residual <- sum((RNAAgeCalc_data_frame_training$Real_Age - RNAAgeCalc_data_frame_training$RNAAge)^2)
+r_squared <- 1 - (ss_residual / ss_total)
+
+print(paste("The R² value is:", r_squared))
+
+print(paste("The correlation between the predicted (RNAAgeCalc) and real ages is:", correlation_value))
+
+print(paste("The MAE is:", mean(abs(model_testing_ages - RNAAgeCalc_data_frame_training$RNAAge))))
+
+
+```
+
+```{r}
+
+wilcox.test(RNAAgeCalc_data_frame_training$Real_Age, RNAAgeCalc_data_frame_training$Predicted_Age, paired = T)
+wilcox.test(RNAAgeCalc_data_frame_training$Real_Age, RNAAgeCalc_data_frame_training$RNAAge, paired = T)
+wilcox.test(RNAAgeCalc_data_frame_training$RNAAge, RNAAgeCalc_data_frame_training$Predicted_Age, paired = T)
+
+
+```
+
+```{r}
+
+#Figuring out the difference between predicted and chronological age of each study group
+
+#devtools::install_github("mali8308/WhichStatTest")
+
+individual_study_test = data.frame(Study = 1:length(unique(predicted_ages_0$GEO)))
+
+a = 1 
+
+for (i in unique(predicted_ages_0$GEO))
+
+{
+  
+  test_p = WhichStatTest::choose_stat_test(predicted_ages_0$Real_Age[predicted_ages_0$GEO==i],
+                                           predicted_ages_0$Predicted_Age[predicted_ages_0$GEO==i])
+  
+  
+  individual_study_test$Study[a] = i
+  individual_study_test$P_Val[a] = test_p$result$p.value
+  
+  a = a + 1
+
+
+  if (test_p$result$p.value < 0.05)
+    
+  {
+    print(predicted_ages_0[predicted_ages_0$GEO==i,])
+
+  }
+  
+}
+
+
+
+```
+
+### Getting the genes that form the ageprint
+
+```{r}
+
+coeff_model = coef(alpha0.fit, s = alpha0.fit$lambda.1se)
+
+coeff_model = as.data.frame(as.matrix(coeff_model))
+
+coeff_model = cbind(coeff_model, row.names(coeff_model))
+
+coeff_model = coeff_model[!coeff_model$s1==0,]
+
+imp_genes_elastic_net = coeff_model$`row.names(coeff_model)`[-1]
+
+degs_norm_counts_DESeq = normalized_counts[which(row.names(normalized_counts) %in% imp_genes_elastic_net),]
+
+dim(degs_norm_counts_DESeq)
+
+```
+
+```{r}
+
+longevity_enchancing_genes = coeff_model$`row.names(coeff_model)`[coeff_model$s1 < 0]
+
+longevity_decreasing_genes = coeff_model$`row.names(coeff_model)`[coeff_model$s1 > 0]
+
+longevity_decreasing_genes = longevity_decreasing_genes[-1]
+
+#longevity_decrease_degree = coeff_model[coeff_model$s1 > 0,]
+
+#longevity_decrease_degree = longevity_decrease_degree[order(longevity_decrease_degree$s1, decreasing = T),]
+
+```
+
+## Figure 3A
+
+```{r}
+
+#PCA of DESeq normalized counts of DEGs for the most important genes (lowest number)
+
+data.prcomp = prcomp(t(degs_norm_counts_DESeq), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, metadata_complete)
+
+pca = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(A) PCA of the training set (n = 236) using the ageprint."))+
+  theme_minimal()
+
+pca
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3a.png", 
+       pca, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 3B
+
+```{r}
+
+#PCA using the genes that decrease longevity
+
+long_dec_counts = degs_norm_counts_DESeq[row.names(degs_norm_counts_DESeq) %in% longevity_decreasing_genes,]
+
+
+data.prcomp = prcomp(t(long_dec_counts), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, metadata_complete)
+
+pca_long_dec = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(B) PCA of the training set (n = 236) using either the RedLong or the ProLong genes."))+
+  theme_minimal()
+
+pca_long_dec
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3b.png", 
+       pca_long_dec, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+PCA of longevity enhancing genes
+
+```{r}
+
+#PCA using the genes that enhance longevity
+
+long_enh_counts = degs_norm_counts_DESeq[row.names(degs_norm_counts_DESeq) %in% longevity_enchancing_genes,]
+
+data.prcomp = prcomp(t(long_dec_counts), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, metadata_complete)
+
+pca_long_enh = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("PCA using the",nrow(long_enh_counts), "ProLong genes.")) + 
+  theme_minimal()
+
+pca_long_enh
+
+ggsave("/Users/ali/Desktop/NYU/2nd Semester/Applied Genomics/long_enh_pca.png", 
+       pca_long_enh, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 3C
+
+```{r}
+
+test_pca_counts = counts_test[row.names(counts_test) %in% imp_genes_elastic_net,]
+
+data.prcomp = prcomp(t(test_pca_counts), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, test_metadata)
+
+pca_test = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(C) PCA of the validation set (n = 298) using the ageprint."))+
+  theme_minimal()
+
+pca_test
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3c.png", 
+       pca_test, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 3D
+
+```{r}
+
+#PCA using the genes that decrease longevity
+
+long_dec_counts = test_pca_counts[row.names(test_pca_counts) %in% longevity_decreasing_genes,]
+
+
+data.prcomp = prcomp(t(long_dec_counts), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, test_metadata)
+
+pca_long_dec_test = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(D) PCA of the validation set (n = 298) using the RedLong genes."))+
+  theme_minimal()
+
+pca_long_dec_test
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3d.png", 
+       pca_long_dec_test, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 3E
+
+```{r}
+
+#PCA using the genes that decrease longevity
+
+long_ench_counts = test_pca_counts[row.names(test_pca_counts) %in% longevity_enchancing_genes,]
+
+
+data.prcomp = prcomp(t(long_ench_counts), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, test_metadata)
+
+pca_long_enh_test = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(E) PCA of the validation set (n = 298) using the ProLong genes."))+
+  theme_minimal()
+
+pca_long_enh_test
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3e.png", 
+       pca_long_enh_test, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+```
+
+## Figure 3F
+
+```{r}
+
+testing_something = cbind(normalized_counts,counts_test)
+
+testing_something = testing_something[row.names(testing_something) %in% imp_genes_elastic_net,]
+
+data.prcomp = prcomp(t(testing_something), scale=TRUE, center=T)
+
+coords2draw = as.data.frame(data.prcomp$x)
+coords2draw = cbind(coords2draw, rbind(metadata_complete,test_metadata))
+
+pca_all = ggplot(coords2draw) +
+  geom_point(mapping=aes(x = PC1, y= PC2, 
+                         col=Decade))+
+  ggtitle(paste("(F) PCA of the entire Skeletome (n = 534) using the ageprint."))+
+  theme_minimal()
+
+pca_all
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3f.png", 
+       pca_all, width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+
+```
+
+## Figure 3 Full
+
+```{r}
+
+library(patchwork)
+# Suppress the legend for individual plots by adding guides(col = "none")
+pca = pca + theme(legend.position = "none")
+pca_all = pca_all + theme(legend.position = "none")
+pca_long_dec = pca_long_dec + theme(legend.position = "none")
+pca_long_enh = pca_test 
+
+legend_theme <- theme(
+  legend.key.size = unit(1.5, "cm"), # Adjust legend key size
+  legend.text = element_text(size = 14) # Adjust legend text size
+)
+
+
+# Combine plots and keep the legend from one plot
+combined_plot <- (pca + pca_long_dec + pca_test  + pca_long_dec_test + pca_long_enh_test + pca_all) + 
+  plot_layout(ncol = 2, nrow = 3, guides = "collect")
+
+#& legend_theme
+
+# Save the combined plot with one legend
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_3.png", 
+       combined_plot, width = 16, height = 16, units = "in", dpi = 500, bg = "white")
+
+combined_plot
+
+
+```
+
+## Figure 4C
+
+```{r}
+
+#Healthy aging
+
+heatmap_counts = degs_norm_counts_DESeq
+
+row.names(heatmap_counts) = (mapIds(org.Hs.eg.db, keys = row.names(heatmap_counts), 
+                                    column = "SYMBOL", keytype = "ENTREZID"))
+
+png("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_4c.png", width = 10000, height = 10000, res = 1800, pointsize = 3.75)
+
+heatmap(cor(t(heatmap_counts)))
+title(main = "(C) Correlation Heatmap of the Ageprint", adj = 0)
+
+dev.off()
+
+heatmap(cor(t(heatmap_counts)))
+
+
+```
+
+## Figure 4B
+
+```{r}
+
+# Initialize an empty data frame to store the reshaped data
+plot_data <- data.frame()
+
+# Loop over each DESeq result and add it to the plot_data
+for (i in 1:length(deseq_decades)) {
+  # Subset the DESeq result to only include important genes
+  current_decade <- deseq_decades[[i]]
+  subset_decade <- current_decade[which(row.names(current_decade) %in% imp_genes_elastic_net), ]
+
+  # Create a data frame with the gene, log2 fold change, and decade information
+  decade_data <- data.frame(
+    Gene = row.names(subset_decade),
+    Log2FoldChange = subset_decade$log2FoldChange,
+    Decade = gsub("_"," ", gsub("_vs_3", "",names(deseq_decades[i])))
+    
+  )
+
+  # Add this data to the plot_data
+  plot_data <- rbind(plot_data, decade_data)
+}
+
+long_enhance_plot_decades = plot_data[which(plot_data$Gene %in% longevity_enchancing_genes),]
+
+long_decrease_plot_decades = plot_data[which(plot_data$Gene %in% longevity_decreasing_genes),]
+
+# Calculate mean Log2FoldChange for each Decade
+mean_log_fc <- long_decrease_plot_decades %>%
+  group_by(Decade) %>%
+  summarize(mean_Log2FoldChange = mean(Log2FoldChange))
+
+mean_log_fc$Decade = factor(mean_log_fc$Decade, levels = c("Decade 2", "Decade 4", "Decade 5", "Decade 6",
+                                                           "Decade 7", "Decade 8", "Decade 9", "Decade 10"))
+
+
+mean_log_fc <- long_enhance_plot_decades %>%
+  group_by(Decade) %>%
+  summarize(mean_Log2FoldChange = mean(Log2FoldChange))
+
+mean_log_fc$Decade = factor(mean_log_fc$Decade, levels = c("Decade 2", "Decade 4", "Decade 5", "Decade 6",
+                                                           "Decade 7", "Decade 8", "Decade 9", "Decade 10"))
+
+combined_data <- rbind(
+  data.frame(long_enhance_plot_decades, Type = "ProLong Genes"),
+  data.frame(long_decrease_plot_decades, Type = "RedLong Genes")
+)
+
+anova_expression = summary(aov(Log2FoldChange ~ Decade * Type, data = combined_data))
+
+print(paste("The F-value is:", unlist(anova_expression)[15], "and the p-value is:", unlist(anova_expression)[19]))
+
+aov_pairwise = TukeyHSD(aov(Log2FoldChange ~ Decade * Type, data = combined_data))
+
+deacde_type_aov = as.data.frame(aov_pairwise$`Decade:Type`)
+
+
+# Calculate the mean Log2FoldChange and standard error for each Decade and Gene Type
+mean_log_fc_combined <- combined_data %>%
+  group_by(Decade, Type) %>%
+  summarize(
+    mean_Log2FoldChange = mean(Log2FoldChange),
+    SE_Log2FoldChange = sd(Log2FoldChange) / sqrt(nrow(metadata_complete))  # Standard Error = SD / sqrt(sample size)
+  )
+
+# Set the factor levels for the Decade variable
+mean_log_fc_combined$Decade <- factor(mean_log_fc_combined$Decade, levels = c("Decade 2", "Decade 4", "Decade 5", 
+                                                                              "Decade 6", "Decade 7", "Decade 8", 
+                                                                              "Decade 9", "Decade 10"))
+
+# Plot the combined data with error bars
+combined_plot <- ggplot(mean_log_fc_combined, aes(x = Decade, y = mean_Log2FoldChange, fill = Type)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +  # Dodge for side by side bars
+  geom_errorbar(aes(ymin = mean_Log2FoldChange - SE_Log2FoldChange, ymax = mean_Log2FoldChange + SE_Log2FoldChange), 
+                position = position_dodge(0.9), width = 0.25) +  # Error bars
+  theme_minimal() +
+  scale_fill_manual(values = c("ProLong Genes" = "#9A3C8A", "RedLong Genes" = "#FD9A4A")) +  # Custom colors
+  labs(
+    x = "Decade",
+    y = "Mean Log2 Fold Change in Gene Expression",
+    title = "(B) Mean Log2 Fold Change in Gene Expression for ProLong and RedLong Genes",
+    fill = "Gene Type"
+  )
+
+# Display the plot
+combined_plot
+
+# Optionally, save the combined plot with error bars
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_4b.png", combined_plot,
+       width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+```
+
+### SkeletAge tested on NMN clinical trial
+
+```{r}
+
+predicted_ages_0[predicted_ages_0$GEO == "GSE196387",]
+
+
+willy=wilcox.test(predicted_ages_0$Real_Age[predicted_ages_0$Condition == "NMN"],
+            predicted_ages_0$Predicted_Age[predicted_ages_0$Condition == "NMN"], paired = T)
+willy
+
+
+```
+
+## Figure 4A
+
+```{r}
+
+# Initialize the dataframe to store gene correlations
+gene_correlations = data.frame(Gene = row.names(degs_norm_counts_DESeq), 
+                               Correlation_with_Age = NA, 
+                               p_value = NA)
+
+# Loop through the genes and calculate correlation along with p-value
+for (i in 1:length(row.names(degs_norm_counts_DESeq))) {
+  
+  # Bind the normalized counts with age metadata
+  test_gene_1 = cbind.data.frame(degs_norm_counts_DESeq[i,], metadata_complete$Age)
+  
+  # Perform cor.test to get both correlation and p-value
+  cor_test_result = cor.test(test_gene_1[,1], test_gene_1[,2])
+  
+  # Store the correlation and p-value in the dataframe
+  gene_correlations$Correlation_with_Age[i] = cor_test_result$estimate
+  gene_correlations$p_value[i] = cor_test_result$p.value
+}
+
+# Convert EntrezIDs to Gene Symbols
+gene_correlations$Gene = mapIds(org.Hs.eg.db, keys = gene_correlations$Gene,
+                                 column = "SYMBOL", keytype = "ENTREZID")
+
+# Filter out NA and only keep genes with p-value < 0.05
+gene_correlations = na.omit(gene_correlations)
+gene_correlations = gene_correlations[gene_correlations$p_value < 0.05, ]
+
+# Convert Gene to factor
+gene_correlations$Gene = as.factor(gene_correlations$Gene)
+
+# Plot the correlations (total)
+# Create a new column for correlation direction
+gene_correlations$Correlation_Direction <- ifelse(gene_correlations$Correlation_with_Age > 0, "RedLong", "ProLong")
+
+genes_cors_total <- ggplot(gene_correlations, aes(
+  x = Correlation_with_Age, 
+  y = Gene, 
+  color = Correlation_Direction, 
+  alpha = -log10(p_value)  # Adjust transparency based on p-value (-log10 to emphasize significance)
+)) +
+  geom_point(size = 4) +  # Adjust bubble size for visibility
+  geom_vline(xintercept = 0, color = "violetred", linetype = "dashed", size = 2) +  # Add red dashed line
+  scale_color_manual(values = c("RedLong" = "#FD9A4A", "ProLong" = "#9A3C8A")) +  # Custom color scale
+  scale_alpha_continuous(
+    range = c(0.2, 1), 
+    name = "Significance\n(-log10 p-value)"  # Customize alpha legend title
+  ) +
+  theme_minimal() +  # Minimal theme for clean look
+  labs(
+    x = "Correlation with Age", 
+    y = "Gene", 
+    title = "(A) Correlation of the Ageprint's Expression with Age",
+    color = "Correlation Direction"
+  ) +
+  theme(axis.text.y = element_text(hjust = 1))  # Align y-axis labels
+
+genes_cors_total
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_4a.png", genes_cors_total,
+       height = 24, width = 13.5, dpi = 500, bg = "white", units = "in")
+
+# Separate positive and negative correlations
+pos_cors = gene_correlations[gene_correlations$Correlation_with_Age > 0, ]
+neg_cors = gene_correlations[gene_correlations$Correlation_with_Age < 0, ]
+
+# Plot positive correlations
+genes_positive = ggplot(pos_cors, aes(y = Gene, x = Correlation_with_Age, fill = p_value)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_gradient2(low = "dodgerblue2", high = "firebrick2") +  # Color scale
+  theme_minimal() +  # Minimal theme
+  labs(x = "Correlation with Age", y = "Gene", fill = "Correlation") +
+  theme(axis.text.y = element_text(hjust = 1))
+
+genes_positive
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/supp_figure_4b.png", genes_positive,
+       height = 12, width = 9, dpi = 500, bg = "white", units = "in")
+
+# Plot negative correlations
+genes_negative = ggplot(neg_cors, aes(y = Gene, x = Correlation_with_Age, fill = p_value)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_gradient2(low = "dodgerblue2", high = "firebrick2") +  # Color scale
+  theme_minimal() +  # Minimal theme
+  labs(x = "Correlation with Age", y = "Gene", fill = "P-value") +
+  theme(axis.text.y = element_text(hjust = 1))
+
+genes_negative
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/supp_figure_4c.png", genes_negative,
+       height = 12, width = 9, dpi = 500, bg = "white", units = "in")
+
+
+gene_correlations[gene_correlations$p_value > 0.05,]
+
+```
+
+## Figure 5
+
+```{r}
+
+genes_26 = read.csv("/Users/ali/Desktop/NYU/SkeletAge/26_genes.csv")
+
+go_enrichment = enrichGO(gene = genes_26$EntrezID,
+                         OrgDb = "org.Hs.eg.db",
+                         keyType = "ENTREZID",
+                         pvalueCutoff = 0.05,
+                         pAdjustMethod = "fdr",
+                         universe = row.names(skeletage_counts),
+                         qvalueCutoff = 0.05,
+                         ont = "BP")
+
+
+figure_5 = plot(barplot(go_enrichment, showCategory = 16))
+
+png("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_5.png", 
+    res = 500, width = 6000, height = 4500)
+
+figure_5
+ 
+dev.off()
+
+
+
+```
+
+## Figure 6
+
+```{r}
+
+library(dplyr)
+
+dgi_table = read.delim("/Users/ali/Downloads/gene_interaction_results-10_24_2024.tsv")
+
+genes_26 = read.csv("/Users/ali/Desktop/NYU/SkeletAge/26_genes.csv")
+
+
+dgi_table_filtered = dgi_table[dgi_table$interaction.score>0.7,]
+
+# Group by entrezgene_id and then summarize
+dgi_summary <- dgi_table_filtered %>%
+  group_by(gene) %>%
+  summarize(
+    drug = paste(unique(drug), collapse = "; ")
+  )
+
+# Display the result
+dgi_summary
+
+#write.csv(dgi_summary, "/Users/ali/Desktop/NYU/SkeletAge/dgi_approved.csv", row.names = F)
+# Bar plot of gene counts by regulatory approval status
+ggplot(dgi_table_filtered, aes(x = gene, fill = regulatory.approval)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Gene Counts by Regulatory Approval Status",
+       x = "Gene", y = "Count",
+       fill = "Approval Status") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Scatter plot of genes and drugs colored by approval status, sized by interaction score
+
+drug_scatter = ggplot(dgi_table_filtered, aes(x = gene, y = drug, color = regulatory.approval, size = interaction.score)) +
+  geom_point() +
+  labs(title = "Genes and Drugs with Interaction Scores by Approval Status",
+       x = "Ageprint Genes", y = "Drug",
+       color = "Approval Status", size = "Interaction Score") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+drug_scatter
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_6.png", drug_scatter,
+       height = 12, width = 15, dpi = 1000, bg = "white", units = "in")
+
+
+```
+
+## Figure 7
+
+```{r}
+
+
+library(ggplot2)
+library(dplyr)
+
+# Calculate the mean age for each study group and join with the main dataframe
+skeletage_metadata <- skeletage_metadata %>%
+  left_join(
+    skeletage_metadata %>%
+      group_by(Study) %>%
+      summarize(mean_age = mean(Age, na.rm = TRUE)),
+    by = "Study"
+  )
+
+# Create the violin plot with fill based on mean age
+Skeletome_plot <- ggplot(skeletage_metadata, aes(x = Study, y = Age, fill = mean_age)) +
+  geom_violin(trim = FALSE) +
+  labs(
+    x = "Study",
+    y = "Age",
+    fill = "Mean Age"
+  ) +
+  scale_fill_gradient(low = "violet", high = "purple3") +
+  theme_minimal()
+
+
+Skeletome_plot
+
+ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_7.png", Skeletome_plot,
+       width = 12, height = 9, units = "in", dpi = 500, bg = "white")
+
+
+
+```
+
+Working code
+
+#-------------------------------------------------------------------------------
+
+```{r}
+
+open_genes = read.delim("/Users/ali/Downloads/gene-confidence-level.tsv", header = T)
+
+open_genes_mechanism = read.delim("/Users/ali/Downloads/gene-aging-mechanisms.tsv")
+
+open_genes$Genes = row.names(open_genes)
+
+open_genes_mechanism$Genes = row.names(open_genes_mechanism)
+
+genes_26 = read.csv("/Users/ali/Desktop/NYU/SkeletAge/26_genes.csv")
+
+
+open_genes_mechanism[open_genes_mechanism$Genes %in% genes_26$Gene_Name,]
+
+open_genes$Genes = row.names(open_genes)
+
+skeletage_genes = readxl::read_xlsx("/Users/ali/Desktop/NYU/SkeletAge/129_important_genes_for_longevity.xlsx")
+
+open_genes[row.names(open_genes) %in% skeletage_genes$Gene_Name,]
+
+```
+
+```{r}
+
+DrugAge = read.csv("/Users/ali/Downloads/dataset/drugage.csv")
+
+for (i in 1:nrow(dgi_table_filtered))
+
+{
+
+  if(nrow(DrugAge[grepl(dgi_table_filtered$drug[i], DrugAge$compound_name, ignore.case = T),]) > 0)
+  {
+    print(DrugAge[grepl(dgi_table_filtered$drug[i], DrugAge$compound_name, ignore.case = T),])
+    print(dgi_table_filtered$drug[i])
+  }
+  
+    
+}
+
+
+
+
+```
