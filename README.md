@@ -26,11 +26,9 @@ SkeletAge is an aging clock designed to predict biological age using transcripto
 
 ## 📂 **Repository Contents**  
 
-- **`data/`**: Preprocessed RNA-seq data and Skeletome database  
-- **`models/`**: Trained elastic net regression model for SkeletAge  
-- **`scripts/`**: R scripts for preprocessing, modeling, and age prediction  
-- **`docs/`**: Methodology, dataset details, and performance metrics  
-- **`results/`**: Key findings, figures, and tables  
+- **`skeletome/`**: Preprocessed RNA-seq data and Skeletome database  
+- **`code/`**: R scripts for preprocessing, modeling, and age prediction  
+- **`manuscripts/`**: Methodology, dataset details, and performance metrics  
 
 ---
 
@@ -41,20 +39,5 @@ SkeletAge was developed using **Skeletome**, a comprehensive database of 534 ske
 - Metadata with accurate age labels  
 - Samples from 19 to 90 years of age across 11 studies  
 
-Access Skeletome and accelerate your aging research: **[Skeletome GitHub Link](#)**  
-
 ---
 
-## 🚀 **Getting Started**  
-
-### **Prerequisites**  
-Ensure you have the following installed:  
-- **R (>= 4.3.3)**  
-- R packages: `glmnet`, `DESeq2`, `tidyverse`, `ggplot2`, `biomaRt`, `clusterProfiler`  
-
-### **Installation**  
-Clone this repository:  
-
-```bash
-git clone https://github.com/username/SkeletAge.git
-cd SkeletAge
