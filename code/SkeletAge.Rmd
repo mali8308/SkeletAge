@@ -1,5 +1,3 @@
-
-
 Muhammad Ali
 
 SkeletAge
@@ -1495,7 +1493,9 @@ dgi_table = read.delim("/Users/ali/Downloads/gene_interaction_results-10_24_2024
 genes_26 = read.csv("/Users/ali/Desktop/NYU/SkeletAge/26_genes.csv")
 
 
-dgi_table_filtered = dgi_table[dgi_table$interaction.score>0.7,]
+dgi_table_filtered = dgi_table[dgi_table$interaction.score>1,]
+
+dgi_table_filtered[dgi_table_filtered$regulatory.approval == "Approved",]
 
 # Group by entrezgene_id and then summarize
 dgi_summary <- dgi_table_filtered %>%
@@ -1573,3 +1573,83 @@ ggsave("/Users/ali/Desktop/NYU/SkeletAge/figures/figure_7.png", Skeletome_plot,
 
 
 ```
+
+## Table 1
+
+```{r}
+
+library(biomaRt)
+# Connect to Ensembl using biomaRt
+ensembl = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+results <- getBM(
+  attributes = c("entrezgene_id",
+                 "wikigene_name",
+                 "wikigene_description",
+                 "interpro",
+                 "interpro_description"),
+  filters = "entrezgene_id",
+  values = genes_26$EntrezID,
+  mart = ensembl
+)
+
+library(dplyr)
+
+# Group by entrezgene_id and then summarize
+results_summary <- results %>%
+  group_by(entrezgene_id) %>%
+  summarize(
+    wikigene_name = paste(unique(wikigene_name), collapse = "; "),
+    wikigene_description = paste(unique(wikigene_description), collapse = "; "),
+    interpro = paste(unique(interpro), collapse = "; "),
+    interpro_description = paste(unique(interpro_description), collapse = "; ")
+  )
+
+# Display the result
+not_ind = which(genes_26$EntrezID %in% results_summary$entrezgene_id)
+
+not_covered = genes_26[-not_ind,]
+
+results_not_in <- getBM(
+  attributes = c("entrezgene_id",
+                 "wikigene_name",
+                 "wikigene_description"),
+  filters = "entrezgene_id",
+  values = not_covered$EntrezID,
+  mart = ensembl
+)
+
+results_not_in
+
+#write.csv(results_not_in, "/Users/ali/Desktop/NYU/SkeletAge/26_genes_not_interpro_table1.csv", row.names = F)
+
+#write.csv(results_summary, "/Users/ali/Desktop/NYU/SkeletAge/26_genes_interpro_table1.csv", row.names = F)
+
+```
+
+
+## Table S2
+
+```{r}
+
+ageprint = data.frame(Genes = row.names(coeff_model)[-1], 
+                      Coefficients = coeff_model$s1[-1])
+
+ageprint_symbols = as.data.frame(mapIds(org.Hs.eg.db, keys = ageprint$Genes,
+                                        column = "SYMBOL", keytype = "ENTREZID"))
+
+ageprint = cbind(ageprint, ageprint_symbols)
+
+ageprint$Gene_Type[ageprint$Coefficients < 0] = "ProLong"
+ageprint$Gene_Type[ageprint$Coefficients > 0] = "RedLong"
+
+ageprint = na.omit(ageprint)
+
+colnames(ageprint)[3] = "Gene_Symbol"
+
+write.csv(ageprint, "/Users/ali/Desktop/NYU/SkeletAge/tables/table_s2.csv", row.names = F)
+
+```
+
+
+
